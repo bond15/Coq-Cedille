@@ -1,0 +1,151 @@
+module MendlerEncodings.
+
+import bool.
+import sum.
+import product.
+import unit.
+
+AlgM ◂ (★ ➔ ★ ) ➔ ★ ➔ ★ =
+λ F : ★ ➔ ★. λ X : ★. ∀ R : ★. (R ➔ X) ➔ F · R ➔ X.
+
+FixM ◂ (★ ➔ ★) ➔ ★ =
+λ F : ★ ➔ ★. ∀ X : ★. AlgM · F · X ➔ X.
+
+foldM ◂ ∀ F : ★ ➔ ★. ∀ X : ★. AlgM · F · X ➔ FixM · F ➔ X
+ = Λ F. Λ X. λ alg. λ d. d alg.
+
+in ◂ ∀ F : ★ ➔ ★. F · (FixM · F) ➔ (FixM · F) =
+Λ F. λ d. Λ X. λ alg. alg · (FixM · F) (foldM alg) d.
+
+
+-- function specific
+
+NatF ◂ ★ ➔ ★  = λ R: ★. Sum · Unit · R.
+
+Nat ◂ ★ = FixM · NatF.
+isEvenAlgM ◂ AlgM · NatF · Bool =
+Λ R. λ rec. λ n. case n (λ _ . tt) (λ n'. not (rec n')).
+
+
+--evaluation of one step of the algebra (let rec be id for Bool)
+onestepeval ◂ Bool = isEvenAlgM (λ x: Bool . x ) (in1 unit).
+onestepeval' ◂ Bool = isEvenAlgM (λ x : Bool. x) (in2 ff).
+
+
+--evaluation of many steps
+
+
+isEvenM ◂ Nat ➔ Bool = foldM isEvenAlgM.
+
+
+
+
+n0 ◂ Nat = (in (in1 unit)).
+n1 ◂ Nat = (in (in2 n0)).
+n2 ◂ Nat = (in (in2 n1)).
+n3 ◂ Nat = (in (in2 n2)).
+n4 ◂ Nat = (in (in2 n3)).
+
+manyeval ◂ { ff ≃ isEvenM n3 } = β.
+
+
+--successor algebra
+succM ◂ AlgM · NatF · Nat = Λ R. λ rec. λ n. case n (λ _. n1) (λ n'.( in  (in2 · Unit · Nat (rec n')))).
+
+
+suc ◂ Nat ➔ Nat = foldM succM.
+
+testsuc  ◂ { n1 ≃ suc n0} = β.
+testsuc' ◂ { n3 ≃ suc n2} = β.
+  
+
+--Add algebra
+addM ◂ Nat ➔ AlgM · NatF · Nat = λ y. Λ R. λ rec. λ n. case n (λ _. y) (λ n'. (suc (rec n')) ).
+
+add ◂ Nat ➔ Nat ➔ Nat = λ y. foldM (addM y).
+
+testadd  ◂ { n3 ≃ add n1 n2 } = β.
+testadd' ◂ { add n2 n2 ≃ n4 } = β.
+
+
+--Define List Nat
+ListNatF ◂ ★ ➔ ★ = λ X : ★.  Sum · Unit · (Product · Nat · X).
+
+ListNat ◂ ★ = FixM · ListNatF.
+
+--Define List length
+
+lenAlgM ◂ AlgM · ListNatF · Nat = Λ R. λ rec. λ l. case l (λ _. n0) (λ l'. suc (rec (pproj2 l'))).
+
+len ◂ ListNat ➔ Nat = foldM lenAlgM.
+
+
+-- construct list [3, 4, 2]
+nil ◂ ListNat = (in (in1 unit)).
+cons2 ◂ ListNat = (in (in2 (pair n2 nil))).
+cons4 ◂ ListNat = (in (in2 (pair n4 cons2))).
+cons3 ◂ ListNat = (in (in2 (pair n3 cons4))).
+list ◂ ListNat = cons3.
+
+
+testlen ◂ { n3 ≃ len list } = β.
+
+
+-- Define ListNat sum
+
+sumListNatAlgM ◂ AlgM · ListNatF · Nat = Λ R. λ rec. λ l. case l (λ _. n0) (λ l'. add (pproj1 l') (rec (pproj2 l'))).
+
+sumList ◂ ListNat ➔ Nat = foldM sumListNatAlgM.
+
+-- test sumList
+
+n5 ◂ Nat = suc n4.
+n6 ◂ Nat = suc n5.
+n7 ◂ Nat = suc n6.
+n8 ◂ Nat = suc n7.
+n9 ◂ Nat = suc n8.
+
+testsumlist ◂ { n9 ≃ sumList list } = β.
+
+
+-- Define Generic List
+-- A is a parameter
+
+-- an example of a parameter vs index
+-- A as the type of list is a parameter
+-- if we had dependent typed list, and index i would be the type of lists of length i
+
+ListF ◂ ★ ➔ ★ ➔ ★ = λ A : ★. λ R : ★. Sum · Unit · (Product · A · R).
+
+List ◂ ★ ➔ ★ = λ A : ★. FixM · (ListF · A).
+
+ListNat' ◂ ★ = List · Nat.
+
+nil' ◂ ListNat' = (in (in1 unit)).
+cons2' ◂ ListNat' = (in (in2 (pair n2 nil'))).
+cons4' ◂ ListNat' = (in (in2 (pair n4 cons2'))).
+cons3' ◂ ListNat' = (in (in2 (pair n3 cons4'))).
+list' ◂ ListNat' = cons3'.
+
+testlistdefinitions ◂ { list' ≃ list } = β.
+
+
+-- Define List length Generically
+
+listLenAlgM ◂ ∀ A : ★. AlgM · (ListF · A) · Nat = Λ A. Λ R. λ rec. λ l. case l (λ _ . n0) (λ l'. suc (rec (pproj2 l'))).
+
+listLen ◂ ∀ A : ★. List · A ➔ Nat = Λ A. foldM (listLenAlgM · A).
+
+-- recal list := [3,4,2] list parameterized by Nat
+testgenericlen ◂ { n3 ≃ listLen list } = β.
+
+-- make a list of Bools [tt,ff,tt]
+
+ListBool ◂ ★ = List · Bool.
+
+bnil ◂ ListBool = (in (in1 unit)).
+bcons1 ◂ ListBool = (in (in2 (pair tt bnil))).
+bcons2 ◂ ListBool = (in (in2 (pair ff bcons1))).
+bcons3 ◂ ListBool = (in (in2 (pair tt bcons2))).
+
+testgenericlen' ◂ { n3 ≃ listLen bcons3 } = β.
