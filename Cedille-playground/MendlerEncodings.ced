@@ -149,3 +149,42 @@ bcons2 ◂ ListBool = (in (in2 (pair ff bcons1))).
 bcons3 ◂ ListBool = (in (in2 (pair tt bcons2))).
 
 testgenericlen' ◂ { n3 ≃ listLen bcons3 } = β.
+
+
+-- Nat Tree Functor  F(X) = 1 + (X x A x X)
+
+NatTreeF ◂ ★ ➔ ★ = λ R : ★ . Sum · Unit · (Product · R · (Product · Nat · R)).
+
+NatTree ◂ ★ = FixM · NatTreeF.
+
+
+-- example Nat tree
+leaf ◂ NatTree = (in (in1 unit)).
+node1 ◂ NatTree = (in (in2 (pair leaf (pair n2 leaf)))).
+node2 ◂ NatTree = (in (in2 (pair leaf (pair n2 leaf)))).
+node3 ◂ NatTree = (in (in2 (pair node1 (pair n5 node2)))).
+
+
+-- Polymorphic Tree Functor
+
+TreeF ◂ ★ ➔ ★ ➔ ★ = λ A : ★. λ R : ★. Sum · Unit · (Product · R · (Product · A · R)).
+
+Tree ◂ ★ ➔ ★ = λ A : ★. FixM · (TreeF · A).
+
+-- compare
+
+same ◂ ι x : NatTree. (Tree · Nat) = [node3, node3].
+
+
+-- Algebra to sum over NatTree
+
+sumTreeAlgM ◂ AlgM · NatTreeF · Nat =
+Λ R. λ rec. λ t. case t (λ _. n0) (λ t'. add (pproj1 (pproj2 t'))
+(add (rec (pproj1 t')) (rec (pproj2 (pproj2 t'))))) .
+
+
+sumTree ◂ NatTree ➔ Nat = foldM sumTreeAlgM.
+
+-- test sumTree
+testsumTree ◂ { n9 ≃ sumTree node3 } = β.
+

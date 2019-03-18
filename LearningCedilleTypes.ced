@@ -1,0 +1,107 @@
+module learn.
+
+Bool ◂ ★ = ∀ X : ★. X ➔ X ➔ X.
+
+tt ◂ Bool = Λ X. λ a. λ b. a.
+ff ◂ Bool = Λ X. λ a. λ b. b.
+
+--non dependent intersection
+Test ◂ ★ = ι x : Bool. Bool. -- declare type
+
+
+-- both cases are the same term so can be intersected
+test ◂ Test = [tt,tt]. -- using declared type
+
+test2 ◂ ι x : Bool . Bool = [tt,tt]. -- inlining type 
+--
+
+
+
+
+Nat ◂ ★ = ∀ X : ★ . (X ➔ X) ➔ X ➔ X.
+zero ◂ Nat = Λ X. λ s. λ z. z.
+suc ◂ Nat ➔ Nat = λ n. Λ X. λ s. λ z. s ( n · X s z).
+
+
+-- ff and zero are the same term , modulo alpha renaming. 
+test3 ◂ ι x : Bool . Nat = [ff, zero].
+
+--nff ◂ Nat = ff. -- casting in cedille?
+--test4 ◂ ι x : Nat . Nat = [ nff, nff].
+
+
+
+-- example with erasure
+
+--Id ◂ ★ = ∀ X : ★. X ➔ X.
+--id ◂ Id =  Λ T. λ x . x.
+
+id ◂ ∀ X : ★. X ➔ X  = Λ T. λ x. x.
+
+idNat ◂ Nat ➔ Nat = id · Nat.
+idBool◂ Bool ➔ Bool = id · Bool.
+
+
+-- over parameterized id
+
+id2 ◂ ∀ X : ★. ∀ Y : ★. ∀ Z : ★.  X ➔ X = Λ X. Λ Y. Λ Z. λ x. x .
+
+idNat2 ◂ Nat ➔ Nat = id2 · Nat · Bool · Bool.
+-- error              id2 · Bool .....
+
+-- another over parametrized id
+
+id3 ◂ ∀ X : ★ . ∀ Y : ★. ∀ Z : ★. Z ➔ Z = Λ X. Λ Y. Λ Z. λ x. x.
+
+idNat3 ◂ Nat ➔ Nat = id3 · Bool · Bool · Nat.
+
+
+-- these version of id all erase to the same term ( λ x . x )
+
+-- id · Nat, idNat, idNat2, idNat3 are all the term λ x.x
+testing ◂ ι x : (Nat ➔ Nat) . (Nat ➔ Nat) = [idNat3, idNat2].
+testing2 ◂ ι x : (Nat ➔ Nat) . (Nat ➔ Nat) = [id · Nat, idNat].
+
+-- how to show this with equality?
+eqid ◂ { idNat3 ≃ id · Nat } = β.
+-- ^^ is equivalent to { λ x.x ≃ λ x.x }
+
+eqid2 ◂ { id3 ≃ id } = β.
+-- ^^ is equivalet to { Λ X. Λ Y. Λ Z. λ x.x ≃ Λ X. λ x. x}
+eqid2alt ◂ { Λ X. Λ Y. Λ Z. λ x . x ≃ Λ X. λ x . x } = β.
+
+--eqidalt2 ◂ { Λ X. Λ Y . Λ Z. λ x . x ≃ Λ X . λ x . x } = λ x . x.
+-- ^^ why is this not valid if β erases to λ x . x?
+
+
+
+
+-- see equational reasoning in cedille-developments
+
+beta-ex ◂ { (λ x . x x) (λ y . y) ≃ ( λ z . z) } = β{(λ x . x)}.
+-- β
+-- β { ( λ x . x ) }
+-- β { ( λ x . x x) ( λ x . x x ) }
+-- why are all of these valid?
+
+Top ◂ ★ = { λ x . x ≃ λ x . x }.
+top ◂ Top = β{λ x . x}.
+
+
+
+zeroEQff ◂ { zero ≃ ff } = β.
+
+-- ex from equational reasoning
+-- prove { a ≃ c } from assumtions { a ≃ b } & { b ≃ c }
+
+-- for some type A and 3 terms of that type,
+
+rho ◂ ∀ A : ★. ∀ a : A. ∀ b : A. ∀ c : A. { a ≃ b} ➔ { b ≃ c }
+    ➔ { a ≃ c } = 
+    Λ A . Λ a. Λ b. Λ c. λ eq1. λ eq2. ρ eq1 - eq2.
+
+-- ρ t - t'
+-- rewrite the type for t' using the equation proved by t
+-- rewrite the type for {b ≃ c } using the equation proved by { a ≃ b }
+
+ 
