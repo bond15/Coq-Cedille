@@ -84,17 +84,21 @@ Inductive pureTerm : Type :=
 | pureLambda : string -> pureTerm
 | pureApp : pureTerm -> pureTerm.
 
-Inductive primType {A : Type} ( tm : A) : Type :=
-| TpVar : string -> primType tm
-| TpLambda : string -> primTpKd tm -> primTpKd tm -> primType tm
-| TpAll : string -> primTpKd tm -> primTpKd tm -> primType tm
-| TpAppTp : primType tm -> primType tm -> primType tm
-| TpAppTm : primType tm -> A -> primType tm
-with primKind {A : Type} (tm : A) : Type :=
-| Star : primKind tm
-  with primTpKd {A : Type} (tm : A) : Type :=
-| TpKdTp : primType tm -> primTpKd tm
-| TpKdKd : primKind tm -> primTpKd tm.
+Polymorphic Inductive primType : Type :=
+| TpVar : string -> primType 
+| TpLambda : string -> primTpKd -> primTpKd -> primType 
+| TpAll : string -> primTpKd -> primTpKd -> primType 
+| TpAppTp : primType -> primType -> primType 
+| TpAppTm : primType -> cTerm -> primType 
+    with primKind  : Type :=
+| Star : primKind 
+    with primTpKd  : Type :=
+| TpKdTp : primType -> primTpKd 
+| TpKdKd : primKind -> primTpKd
+    with cTerm : Type :=
+| TmVar : string -> cTerm
+| TmLambda : string -> primType -> cTerm -> cTerm
+| TmAppTm : cTerm -> cTerm -> cTerm.
 
 Set Printing Universes.
 
