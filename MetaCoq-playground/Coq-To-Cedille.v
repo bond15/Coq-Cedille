@@ -110,7 +110,7 @@ Compute (simpleTypeToCedille rnat).
 (* nat list *)
 Inductive natList : Type :=
 | nil : natList
-| ncons : natList -> nat -> natList.
+| ncons : nat -> natList -> natList.
 
 Quote Recursively Definition rnatList := natList.
 
@@ -135,3 +135,70 @@ Quote Recursively Definition rulc := ulc.
 
 Compute (simpleTypeToCedille rulc).
 
+
+
+
+
+
+(* adding single parameter polymorphic types *)
+
+Inductive natMaybe : Type :=
+| some : nat -> natMaybe
+| none : natMaybe.
+
+Inductive Maybe ( A : Type ) : Type :=
+| some_a : A -> A -> A -> (Maybe A)
+| no_a : (Maybe A).
+
+Inductive Which ( A B C : Type ) : Type :=
+| cc : A -> B -> C -> A -> B -> C -> B-> (Which A B C).
+
+Quote Recursively Definition rnm := natMaybe.
+Quote Recursively Definition rm  := Maybe.
+Quote Recursively Definition mm  := Which.
+
+Print mm.
+Print rnm.
+Print rm.
+Print one_inductive_body.
+
+Compute (getSimpleType rm).
+Compute (getSimpleCtors rm).
+
+Fixpoint toFunctor ( t : term) : Functor :=
+  match t with
+  | tProd (nNamed _) (tSort _) (tApp _ _) => unit  
+  | tProd (nNamed _) (tSort _) r => (toFunctor r)  
+  | tProd nAnon (tRel _) (tApp _ _) => (prod (const "A") carry)
+  | tProd nAnon (tRel _) r => (prod (const "A") (toFunctor r))                                      
+  | _ => empty
+  end.
+
+Definition TypeToFunctor (t : rTerm) :=
+  let pieces := map (fun c => toFunctor (snd (fst c))) (getSimpleCtors t)
+  in
+  glue pieces.
+
+Fixpoint TypeToCedille ( r : rTerm ) : string :=
+  (print (def ((getName r)++"F")  (arr (arr star star) star) (tLambda "A" star (tLambda "R" star  (convertF (TypeToFunctor r)))))).
+
+
+Compute (TypeToFunctor rm).
+Compute (TypeToCedille rm).
+
+Inductive mlist (A : Type) : Type :=
+| n : (mlist A)
+| c : A -> (mlist A) -> (mlist A).
+
+Quote Recursively Definition rmlist := mlist.
+
+Compute (TypeToCedille rmlist).
+
+(* broken *)
+Inductive tree (A : Type) : Type :=
+| leaf : (tree A)
+| node : A -> (tree A) -> (tree A) -> (tree A).
+
+Quote Recursively Definition rtree := tree.
+
+Compute (TypeToCedille rtree).
