@@ -17,7 +17,6 @@ foldM ◂ ∀ F : ★ ➔ ★. ∀ X : ★. AlgM · F · X ➔ FixM · F ➔ X
 in ◂ ∀ F : ★ ➔ ★. F · (FixM · F) ➔ (FixM · F) =
 Λ F. λ d. Λ X. λ alg. alg · (FixM · F) (foldM alg) d.
 
-
 -- function specific
 
 NatF ◂ ★ ➔ ★  = λ R: ★. Sum · Unit · R.
@@ -167,7 +166,8 @@ node3 ◂ NatTree = (in (in2 (pair node1 (pair n5 node2)))).
 
 -- Polymorphic Tree Functor
 
-TreeF ◂ ★ ➔ ★ ➔ ★ = λ A : ★. λ R : ★. Sum · Unit · (Product · R · (Product · A · R)).
+TreeF ◂ ★ ➔ ★ ➔ ★ =
+  λ A : ★. λ R : ★. Sum · Unit · (Product · R · (Product · A · R)).
 
 Tree ◂ ★ ➔ ★ = λ A : ★. FixM · (TreeF · A).
 
@@ -176,15 +176,29 @@ Tree ◂ ★ ➔ ★ = λ A : ★. FixM · (TreeF · A).
 same ◂ ι x : NatTree. (Tree · Nat) = [node3, node3].
 
 
--- Algebra to sum over NatTree
+-- Algebra to sum over left brances of a NatTree
 
 sumTreeAlgM ◂ AlgM · NatTreeF · Nat =
-Λ R. λ rec. λ t. case t (λ _. n0) (λ t'. add (pproj1 (pproj2 t'))
-(add (rec (pproj1 t')) (rec (pproj2 (pproj2 t'))))) .
-
+     Λ R. λ rec. λ t.
+       case t
+     	  (λ _. n0)
+  	  (λ t'. add (pproj1 (pproj2 t')) (rec (pproj1 t'))).
 
 sumTree ◂ NatTree ➔ Nat = foldM sumTreeAlgM.
 
+
+-- Algebra to sum over whole NatTree.
+
+--sumTreeAlgM ◂ AlgM · NatTreeF · Nat =
+ --   Λ R. λ rec. λ t.
+  --    case t
+   --   	   (λ _. n0)
+--	   (λ t'. add (pproj1 (pproj2 t'))
+--	      (add (rec (pproj1 t')) (rec (pproj2 (pproj2 t'))))) .
+
+
+--sumTree ◂ NatTree ➔ Nat = foldM sumTreeAlgM.
+
 -- test sumTree
-testsumTree ◂ { n9 ≃ sumTree node3 } = β.
+--testsumTree ◂ { n9 ≃ sumTree node3 } = β.
 
