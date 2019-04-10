@@ -51,28 +51,12 @@ Inductive Functor : Type :=
 (* garbage *)
 | empty : Functor.    
 
-
-Fixpoint ctorToFunctor ( c : term ) :=
-  match c with
-  | tRel _ => unit
-  | tProd _ (tInd t _ ) (tRel _ ) => (const t.(inductive_mind))              
-  | tProd _ (tRel _) (tRel _) => carry
-  | tProd _ (tInd t _) r => (prod (const t.(inductive_mind)) (ctorToFunctor r))
-  | tProd _ (tRel _ ) r => (prod carry (ctorToFunctor r))
-  | _ => empty
-  end.
-
 Fixpoint glue ( f : list Functor) : Functor :=
   match f with
   | nil => empty
   | x :: nil => x
   | x :: xs => (coprod x (glue xs))
   end.
-
-Definition simpleTypeToFunctor (rt : rTerm) :=
-  let pieces := map (fun c => ctorToFunctor (snd (fst c))) (getSimpleCtors rt)
-  in
-  glue pieces.
                             
 Fixpoint convertF ( f : Functor ) : ced :=
   match f with
@@ -91,100 +75,88 @@ Definition getName (r : rTerm) : string:=
   end.
 
 
-Fixpoint simpleTypeToCedille ( r : rTerm ) : string :=
-  (print (def ((getName r)++"F")  (arr star star) (tLambda "R" star  (convertF (simpleTypeToFunctor r))))).
-
-
-(* examples *)
-
-(*Nat*)
-Inductive nat : Type :=
-| z : nat
-| s : nat -> nat.
-
-Quote Recursively Definition rnat := nat.
-
-Compute (simpleTypeToCedille rnat).
-
-
-(* nat list *)
-Inductive natList : Type :=
-| nil : natList
-| ncons : nat -> natList -> natList.
-
-Quote Recursively Definition rnatList := natList.
-
-Compute (simpleTypeToCedille rnatList).
-
-(* nat tree *)
-Inductive natTree : Type :=
-| nleaf : natTree
-| nnonde : natTree -> nat -> natTree -> natTree.
-
-Quote Recursively Definition rnatTree := natTree.
-
-Compute (simpleTypeToCedille rnatTree).
-
-(* untyped lambda calculus *)
-Inductive ulc : Type :=
-| vars : string -> ulc
-| lambda : string -> ulc -> ulc
-| app : ulc -> ulc -> ulc.                              
-
-Quote Recursively Definition rulc := ulc.
-
-Compute (simpleTypeToCedille rulc).
+Definition total_map (A : Type)  := Datatypes.nat -> A.
+Definition t_empty { A : Type } ( v : A ) : total_map A :=
+  (fun _ => v).
+Definition t_update { A: Type } ( m : total_map A) (n : Datatypes.nat) (v : A) :=
+  (fun n' =>  if (Nat.eqb n n') then v else m n').
 
 
 
-
-
-
-(* adding single parameter polymorphic types *)
-
-Inductive natMaybe : Type :=
-| some : nat -> natMaybe
-| none : natMaybe.
-
-Inductive Maybe ( A : Type ) : Type :=
-| some_a : A -> A -> A -> (Maybe A)
-| no_a : (Maybe A).
-
-Inductive Which ( A B C : Type ) : Type :=
-| cc : A -> B -> C -> A -> B -> C -> B-> (Which A B C).
-
-Quote Recursively Definition rnm := natMaybe.
-Quote Recursively Definition rm  := Maybe.
-Quote Recursively Definition mm  := Which.
-
-Print mm.
-Print rnm.
-Print rm.
-Print one_inductive_body.
-
-Compute (getSimpleType rm).
-Compute (getSimpleCtors rm).
-
-Fixpoint toFunctor ( t : term) : Functor :=
+Fixpoint hToFunctor (t : term ) (n : Datatypes.nat) (m : total_map ident) : Functor :=
   match t with
-  | tProd (nNamed _) (tSort _) (tApp _ _) => unit  
-  | tProd (nNamed _) (tSort _) r => (toFunctor r)  
-  | tProd nAnon (tRel _) (tApp _ _) => (prod (const "A") carry)
-  | tProd nAnon (tRel _) r => (prod (const "A") (toFunctor r))                                      
+  (*map  lookups *)
+  | (tRel n') => (const (m (n-n'-1)))
+  | (tApp (tRel n') _ ) => (const (m (n-n'-1))) (* todo: specific type application *)
+  | (tApp (tInd ind _ ) _) => (const ind.(inductive_mind))
+  | (tInd ind _ ) => (const ind.(inductive_mind)) 
+  (* insert to map *)
+  | tProd (nNamed tyname) (tSort _) rt => (hToFunctor rt (n+1) (t_update m n tyname))
+
+  (* recursively process *)
+  | tProd _ rt1 rt2 => (prod (hToFunctor rt1 n m) (hToFunctor rt2 (n+1) m))
+
+  (* error *)                       
   | _ => empty
   end.
 
-Definition TypeToFunctor (t : rTerm) :=
-  let pieces := map (fun c => toFunctor (snd (fst c))) (getSimpleCtors t)
-  in
-  glue pieces.
+Definition toFunctor (t : term ) (name : ident) : Functor :=
+  (hToFunctor t 1 (t_update (t_empty "NULL") 0 name)).
 
+(* looks for the carrier type in const *)
+Fixpoint findCarry (f : Functor) (name : string ) : Functor :=
+  match f with
+  | const n => if (eq_string n name) then carry else (const n)
+  | coprod t rt => (coprod (findCarry t name) (findCarry rt name))
+  | prod t rt => (prod (findCarry t name) (findCarry rt name))
+  | unit => unit
+  | carry => carry
+  | empty => empty
+  end.
+
+Fixpoint replaceCarry (f : Functor ) : Functor :=
+  match f with
+  | prod t carry => t
+  | prod t rt => (prod t (replaceCarry rt))
+  | coprod carry rt => coprod unit (replaceCarry rt)
+  | coprod t rt => coprod t (replaceCarry rt)
+  | const n => const n
+  | unit => unit
+  | carry => carry
+  | empty => empty
+  end.
+
+Definition TypeToFunctor (t : rTerm) :=
+  let pieces := map (fun c => (toFunctor (snd (fst c)) (getName t))) (getSimpleCtors t)
+  in
+  (replaceCarry (findCarry (glue pieces) (getName t))).
+
+Inductive T1 (A : Type)  : Type :=
+| c1 : A  -> (T1 A).
+
+Inductive T2 : Type :=
+| c2 : T2 -> T2.
+
+Inductive T3 (B : Type) : Type :=
+| c3 : B -> T1 B -> (T3 B).
+
+Quote Recursively Definition rt1 := T1.
+Quote Recursively Definition rt2 := T2.
+Quote Recursively Definition rt3 := T3.
+Compute (TypeToFunctor rt3).
+
+Compute (TypeToFunctor rt1).
+Compute (TypeToFunctor rt2).
+Compute (getSimpleCtors rt2).
+
+(* TODO : Compute the Kind, Binders for Type Parameters in Functor *)
 Fixpoint TypeToCedille ( r : rTerm ) : string :=
   (print (def ((getName r)++"F")  (arr (arr star star) star) (tLambda "A" star (tLambda "R" star  (convertF (TypeToFunctor r)))))).
 
 
-Compute (TypeToFunctor rm).
-Compute (TypeToCedille rm).
+
+
+(* examples *)
 
 Inductive mlist (A : Type) : Type :=
 | n : (mlist A)
@@ -192,13 +164,24 @@ Inductive mlist (A : Type) : Type :=
 
 Quote Recursively Definition rmlist := mlist.
 
+Print rmlist.
+Compute (getSimpleType rmlist).
+Compute (TypeToFunctor rmlist).
 Compute (TypeToCedille rmlist).
 
-(* broken *)
+
 Inductive tree (A : Type) : Type :=
 | leaf : (tree A)
 | node : A -> (tree A) -> (tree A) -> (tree A).
 
 Quote Recursively Definition rtree := tree.
 
+Compute (TypeToFunctor rtree).
 Compute (TypeToCedille rtree).
+
+Inductive asdf ( B : Type ) : Type :=
+| ll : (tree B) -> (asdf B).
+
+Quote Recursively Definition rasdf := asdf.
+
+Compute (TypeToFunctor rasdf).
