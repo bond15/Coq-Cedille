@@ -2,8 +2,6 @@ Require Import Template.All.
 Require Import List String.
 Load Cedille.
 
-(* first approximation at getting constructors for 'simple' types and converting them to a functor represenation *)
-
 Definition rTerm := prod global_declarations term.
 Definition ctor := (prod (prod ident term) nat).
 
@@ -131,27 +129,36 @@ Definition TypeToFunctor (t : rTerm) :=
   in
   (replaceCarry (findCarry (glue pieces) (getName t))).
 
-Inductive T1 (A : Type)  : Type :=
-| c1 : A  -> (T1 A).
 
-Inductive T2 : Type :=
-| c2 : T2 -> T2.
+Fixpoint hbinders (t : term) (body : ced ): ced :=
+  match t with
+  | tProd (nNamed name) _ (tSort _) => pLambda name body  (* end *)
+  | tProd (nNamed name) _ rt => pLambda name (hbinders rt body)
+  | _ => star 
+  end.
 
-Inductive T3 (B : Type) : Type :=
-| c3 : B -> T1 B -> (T3 B).
+Definition binders (rt :rTerm ) : ced :=
+  match (getSimpleType rt) with
+  | Some t =>  (hbinders t.(ind_type) (pLambda "R" (convertF (TypeToFunctor rt))))
+  | None => star
+  end.
 
-Quote Recursively Definition rt1 := T1.
-Quote Recursively Definition rt2 := T2.
-Quote Recursively Definition rt3 := T3.
-Compute (TypeToFunctor rt3).
+Fixpoint hKind (t : term) : ced :=
+  match t with
+  | tProd _ _ (tSort _ ) => (arr (arr star star) star)
+  | tProd _ _ rt => (arr (hKind rt) star)
+  | _ => star
+  end.
 
-Compute (TypeToFunctor rt1).
-Compute (TypeToFunctor rt2).
-Compute (getSimpleCtors rt2).
+Definition Kind (rt : rTerm ) : ced :=
+  match (getSimpleType rt) with
+  | Some t => (hKind t.(ind_type))
+  | None => star
+  end.
 
-(* TODO : Compute the Kind, Binders for Type Parameters in Functor *)
-Fixpoint TypeToCedille ( r : rTerm ) : string :=
-  (print (def ((getName r)++"F")  (arr (arr star star) star) (tLambda "A" star (tLambda "R" star  (convertF (TypeToFunctor r)))))).
+
+Definition TypeToCedille ( r : rTerm ) : string :=
+  (print (def ((getName r)++"F") (Kind r)  (binders r))).
 
 
 
@@ -160,7 +167,7 @@ Fixpoint TypeToCedille ( r : rTerm ) : string :=
 
 Inductive mlist (A : Type) : Type :=
 | n : (mlist A)
-| c : A -> (mlist A) -> (mlist A).
+| cn : A -> (mlist A) -> (mlist A).
 
 Quote Recursively Definition rmlist := mlist.
 
@@ -179,9 +186,3 @@ Quote Recursively Definition rtree := tree.
 Compute (TypeToFunctor rtree).
 Compute (TypeToCedille rtree).
 
-Inductive asdf ( B : Type ) : Type :=
-| ll : (tree B) -> (asdf B).
-
-Quote Recursively Definition rasdf := asdf.
-
-Compute (TypeToFunctor rasdf).
