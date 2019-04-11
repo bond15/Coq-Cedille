@@ -26,6 +26,12 @@ isEvenAlgM ◂ AlgM · NatF · Bool =
 Λ R. λ rec. λ n. case n (λ _ . tt) (λ n'. not (rec n')).
 
 
+-- smart constructors
+
+z ◂ Nat = (in  (in1 unit)).
+s ◂ Nat ➔ Nat = λ n. (in (in2 n)). 
+
+
 --evaluation of one step of the algebra (let rec be id for Bool)
 onestepeval ◂ Bool = isEvenAlgM (λ x: Bool . x ) (in1 unit).
 onestepeval' ◂ Bool = isEvenAlgM (λ x : Bool. x) (in2 ff).

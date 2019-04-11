@@ -24,7 +24,10 @@ Inductive ced : Type :=
 | plambda : string -> ced -> ced
 | pLambda : string -> ced -> ced
 | tAll : string -> ced -> ced -> ced.
-                               
+
+Definition program := list ced.
+
+
 Fixpoint print( t : ced) : string :=
   match t with
   | def str kty tyterm => str ++ s_spc ++  s_asgn ++ s_spc  ++ (print kty) ++ s_eq ++ (print tyterm) ++ "."
@@ -61,3 +64,15 @@ Definition In : ced :=
 
 Compute (print In).
 
+(* TODO add AlgM *)
+Search list.
+Definition cedilleMendlerFramework : program  := (cons FixM (cons foldM (cons In nil))).
+
+Fixpoint printProgram (p : program) : string :=
+  match p with
+  | cons x xs => (print x)++"  " ++ (printProgram xs)
+  | nil => ""
+  end.
+
+Compute (printProgram cedilleMendlerFramework).
+                                          

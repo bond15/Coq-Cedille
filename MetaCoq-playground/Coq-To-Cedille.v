@@ -5,6 +5,30 @@ Load Cedille.
 Definition rTerm := prod global_declarations term.
 Definition ctor := (prod (prod ident term) nat).
 
+
+
+Fixpoint Error (t : term) :ced :=
+  match t with
+  | (tConstruct _ _ _) => (tvar "ERROR -tConstruct")
+  | (tConst _ _ ) => (tvar "ERROR -tConst")
+  | (tInd _ _) => (tvar "ERROR -tInd")
+  | (tRel _) => (tvar "ERROR -tRel")
+  | (tVar _ ) => (tvar "ERROR-tVar")                          
+  | (tMeta _ ) => (tvar "ERROR -tMeta")
+  | (tEvar _ _ ) => (tvar "ERROR -tEvar")
+  | (tSort _ ) => (tvar "ERROR -tSort")
+  | (tCast _ _ _ ) => (tvar "ERROR -tCast")
+  | (tProd _ _ _) => (tvar "ERROR -tProd")                     
+  | (Ast.tLambda _ _ _) => (tvar "ERROR -tLambda")
+  | (tLetIn _ _ _ _) => (tvar "ERROR -tLetIn")
+  | (tApp _ _) => (tvar "ERROR -tApp")
+  | (tCase _ _ _ _) => (tvar "ERROR -tCase")
+  | (tProj _ _ ) => (tvar "ERROR -tProj")
+  | (tFix _ _) => (tvar "ERROR -tFix")
+  | (tCoFix _ _) => (tvar "ERROR -tCoFix")
+  end.
+
+
 (* a dummy global declaration used as the default value of the list last function *)
 Definition dummy : global_decl := ConstantDecl "" {|cst_type:= (tRel 0); cst_body := None; cst_universes := Monomorphic_ctx (UContext.make nil ConstraintSet.empty) |}.
 
@@ -23,7 +47,6 @@ Definition getLastType (rt : rTerm) : option (list one_inductive_body) :=
   (last (getTypes rt) None).
 
 Definition getSimpleType (rt : rTerm ) :=
-(* match (head (fst rt)) with *)
   match (getLastDecl rt ) with
   | Some (InductiveDecl ker mib) =>
     match (head mib.(ind_bodies)) with
@@ -156,9 +179,13 @@ Definition Kind (rt : rTerm ) : ced :=
   | None => star
   end.
 
+(* TODO : add fixpoint and smart constructors *)
+Definition TypeToCedille ( r : rTerm ) :=
+  let functor := (def ((getName r)++"F") (Kind r)  (binders r)) in
+  (*let fixfunctor := *)
+  (*smart constructors*)
+  print functor.
 
-Definition TypeToCedille ( r : rTerm ) : string :=
-  (print (def ((getName r)++"F") (Kind r)  (binders r))).
 
 
 
@@ -186,3 +213,154 @@ Quote Recursively Definition rtree := tree.
 Compute (TypeToFunctor rtree).
 Compute (TypeToCedille rtree).
 
+
+(* Algebras *)
+
+
+
+Fixpoint evenb (n : Datatypes.nat) : bool :=
+  match n with
+  | S n' => negb (evenb n')
+  | O => true
+  end.
+
+Quote Recursively Definition re := evenb.
+
+Definition getFix (r : rTerm) :=
+  match (getLastDecl r) with
+  | Some (ConstantDecl _ t ) => t.(cst_body)
+  | _ => None
+  end.
+
+Definition getFixBody (r : rTerm) :=
+  match (getFix r) with
+  | Some (tFix tm  _)  => match head tm with
+                          | Some rec => Some rec.(dbody)
+                          | _ => None
+                          end
+  | _ => None
+  end.
+
+Fixpoint rindexmap (t : term) (n : nat) (m : total_map ident) :=
+  match t with
+  | (Ast.tLambda (nNamed name) _ (tCase _ _ _ _)) => pair (t_update m n name) (n+1)
+  | (Ast.tLambda (nNamed name) _ rt ) =>  (rindexmap rt (n+1) (t_update m n name)) 
+  | _ => pair m n
+  end.
+
+
+Definition indexmap (r : rTerm) :=
+  match (getFixBody r) with
+  | Some x => (rindexmap x 1 (t_update (t_empty "ERROR -index map") 0 "function_Name"))
+  | _ => pair (t_empty "ERROR") 0
+  end.
+
+(* TODO : recursive function calls replaced with rec *)                          
+
+Fixpoint getFixCases' (t : term) :=
+  match t with
+  | (Ast.tLambda _ _ (tCase _ _ _ c)) => Some c
+  | (Ast.tLambda _ _ rt) => (getFixCases' rt)
+  | _ => None
+  end.
+
+Definition getFixCases (r : rTerm) :=
+  match (getFixBody r) with
+  | Some x =>
+    match (getFixCases' x) with
+    | Some xs => xs
+    | _ => nil
+    end
+  | _ => nil
+  end.
+
+
+
+Fixpoint findConstructors (str : string) (l : list global_decl) :=
+  let ct := (fun t =>  match head t with
+                      | Some t => t.(ind_ctors)
+                      | None => nil
+                       end ) in
+  match l with
+  | (InductiveDecl name t)::xs => if (eq_string name str) then (ct t.(ind_bodies)) else (findConstructors str xs)
+  | _ => nil
+  end.
+
+Definition d : ctor  := pair (pair "t" (tRel 0)) 0.
+
+
+Definition findConstructor (n:nat)(str : string) (r : rTerm) :=
+   (fst (fst (nth n (findConstructors str (fst r)) d))).
+
+
+
+Print ced.
+Fixpoint processAppList (l : list term) (n : nat) (m : total_map ident) : ced :=
+  let f := (fun x => match x with
+                     | (tRel x) => (tvar (m(n-x-1)))
+                     | (tConstruct t n' _) => (tvar (findConstructor n' t.(inductive_mind) re))
+                     | (tInd t _) => (tvar t.(inductive_mind))
+                     | _ => (tvar "ERROR papplist")
+                     end) in
+  match l with
+  | x :: nil => f x 
+  | x :: xs => (tAppt (f x) (processAppList xs n m))
+  | _ => (tvar "ERROR -app list")
+  end.
+
+
+Fixpoint parseCase (t : term)(n : nat)(m : total_map ident) : ced :=
+  match t with
+  | (Ast.tLambda (nNamed name) _ rt) => (plambda name (parseCase rt (n+1) (t_update m n name)))
+  | (tApp t1 (t2::xs)) => (tAppt (parseCase t1 n m) (processAppList (t2::xs) n m))
+  | (tInd t _ ) => (tvar t.(inductive_mind))
+  | (tRel x) => (tvar (m(n-x-1)))
+  | (tConst x _ ) => (tvar x)
+  | (tConstruct t n' _) => (tvar (findConstructor n' t.(inductive_mind) re))
+  (* *)
+  | _ => (tvar "ERROR parseCase")
+  end.
+
+Quote Recursively Definition radd := Nat.add.
+
+
+Definition toCed (r : rTerm) :=
+  let start_map := (fst (indexmap r)) in
+  let start_index := (snd (indexmap r)) in 
+  let cases := (getFixCases r) in
+  map (fun c => (parseCase (snd c) start_index start_map)) cases.
+
+Compute (toCed radd).
+
+(*
+body...
+tFix 
+dname = evenb
+dtype = nat -> bool
+dbody = Ast.tLambda 
+          name = n
+          term1 = tInd .. nat
+          term2 = tCase
+                    Inductive * nat = (nat , 0) 
+                    term = Ast.tLambda
+                             name = n
+                             term = tInd nat
+                             term = tInd bool
+                    term = tRel 0 --- n
+                    List(nat * term) =
+                              (0, tConstruct ( bool, 0 , nil)) --- nat for which constructor?
+                              (1, Ast.tLambda 
+                                    name = n'
+                                    term = tInd nat
+                                    term = tApp 
+                                              tConst negb
+                                              tApp
+                                                 tRel 2 --- evenb
+                                                 tRel 0 --- n'
+ *)
+Print tConstruct. (* inductive -> nat -> universe_instance -> term *)
+Print Ast.tLambda. (* name -> term -> term -> term *)
+Print tCase. (* inductive * nat -> term -> term -> list (nat * term) -> term *)
+Print tFix. (* mfixpoint term -> nat -> term *)
+Print mfixpoint. (* term => list (Ast.def term) *)
+Print Ast.def. (* Record   {dname, dtype, dbody, rarg} *)
