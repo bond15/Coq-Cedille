@@ -78,6 +78,15 @@ ListNatF ◂ ★ ➔ ★ = λ X : ★.  Sum · Unit · (Product · Nat · X).
 
 ListNat ◂ ★ = FixM · ListNatF.
 
+--sart constructors
+
+nnil ◂ ListNat = (in (in1 unit)).
+ncons ◂ Nat ➔ ListNat ➔ ListNat = λ n. λ xs. (in (in2 (pair n xs))).
+
+testing ◂ ListNat = ncons n4 (ncons n2 nnil).
+
+
+
 --Define List length
 
 lenAlgM ◂ AlgM · ListNatF · Nat = Λ R. λ rec. λ l. case l (λ _. n0) (λ l'. suc (rec (pproj2 l'))).
@@ -94,7 +103,7 @@ list ◂ ListNat = cons3.
 
 
 testlen ◂ { n3 ≃ len list } = β.
-
+testlen' ◂ { n2 ≃ len testing } = β.
 
 -- Define ListNat sum
 
@@ -176,6 +185,13 @@ TreeF ◂ ★ ➔ ★ ➔ ★ =
   λ A : ★. λ R : ★. Sum · Unit · (Product · R · (Product · A · R)).
 
 Tree ◂ ★ ➔ ★ = λ A : ★. FixM · (TreeF · A).
+
+
+-- smart constructors
+
+--tleaf ◂ ∀ X : ★. X ➔ Tree = Λ X. (in (in1 unit)).
+-- tnode ◂ Nat  ➔ Tree ➔ Tree ➔ Tree =  λ x. λ l. λ r. (in (in2 (pair l (pair x r)))).
+
 
 -- compare
 
